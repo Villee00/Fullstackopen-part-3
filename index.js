@@ -1,8 +1,11 @@
 const { request, response } = require("express");
 
+require('dotenv').config()
 const express = require("express")
 const morgan = require("morgan")
 const cors = require("cors")
+const Person = require('./models/person');
+const { Mongoose } = require("mongoose");
 
 const app = express()
 
@@ -12,49 +15,23 @@ app.use(express.json())
 morgan.token('content', (req, res) =>{return JSON.stringify(req.body) })
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :content'))
 
-
-let taulukko = [
-    {
-    "id": 1,
-    "name": "Art",
-    "number": "555",
-    },
-    {
-    "id": 2,
-    "name": "ada",
-    "number": "555",
-    },
-    {
-    "id": 3,
-    "name": "dfsf",
-    "number": "242421414124142",
-    },
-    {
-    "id": 4,
-    "name": "ggdgrdgdgdgdgdg",
-    "number": "231312151555",
-    }
-]
-
 app.get('/api/persons',(req, response) =>{
-    response.send(taulukko)
+    Person.find({})
+    .then(persons => {
+        response.send(persons)
+    })
 })
 
 app.get('/api/persons/:id',(req, response) =>{
-    const person = taulukko.find(target => target.id === Number(req.params.id))
-    if(person){
+    Person.findById(req.params.id).then(person => {
         response.send(person)
-    }
-    else{
-        response.status(404).end()
-    }
-    
+    })
 })
 
-app.get('/info',(req, response) =>{
-    const resp = `Phonebook has info for ${taulukko.length} people <br> ${new Date()}` 
-    response.send(resp)
-})
+// app.get('/info',(req, response) =>{
+//     const resp = `Phonebook has info for ${taulukko.length} people <br> ${new Date()}` 
+//     response.send(resp)
+// })
 
 app.delete('/api/persons/:id',(req, response) =>{
     taulukko = taulukko.filter(person => person.id !== Number(req.params.id))
@@ -68,18 +45,13 @@ app.post('/api/persons', (req, response) =>{
         const errorMessage = {error: 'content needs name and number field'}
         return response.status(400).json(errorMessage)
     }
-
-    if(taulukko.find(person => person.name === body.name)){
-        const errorMessage = {error: 'name must be unique'}
-        return response.status(400).json(errorMessage)
-    }
-
-    const person = {
-        id: Math.floor(Math.random() * Math.floor(100000000)),
+    const person = new Person({
         name: body.name,
         number: body.number
-    }
-    taulukko = taulukko.concat(person)
+    })
+    person.save().then(response => {
+        console.log("Person added to db")
+    })
 
     response.json(person)
 })
@@ -93,7 +65,7 @@ app.put('/api/persons/:id', (req, res) =>{
     res.json(newPerson)
     
 })
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT
 app.listen(PORT, () =>{
     console.log("Server started at port " + PORT)
 })

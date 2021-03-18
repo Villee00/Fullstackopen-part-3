@@ -34,7 +34,15 @@ app.get('/api/persons/:id',(req, response) =>{
 // })
 
 app.delete('/api/persons/:id',(req, response) =>{
-    taulukko = taulukko.filter(person => person.id !== Number(req.params.id))
+    
+    Person.findByIdAndRemove(req.params.id)
+    .then(result=> {
+        response.status(204).end()
+    })
+    .catch(error =>{
+        next(error)
+    })
+
     response.status(204).end()
 })
 

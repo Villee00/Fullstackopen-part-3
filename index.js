@@ -3,9 +3,9 @@ const { request, response } = require("express");
 require('dotenv').config()
 const express = require("express")
 const morgan = require("morgan")
+
 const cors = require("cors")
 const Person = require('./models/person');
-const { Mongoose } = require("mongoose");
 
 const app = express()
 
@@ -15,6 +15,19 @@ app.use(express.json())
 morgan.token('content', (req, res) =>{return JSON.stringify(req.body) })
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :content'))
 
+const errorHandler = (error, req, res, next) =>{
+    if(error.name === "CastError"){
+        return res.status(404).send({error: "malformed id"})
+    }
+    else if(error.name === "ValidationError"){
+        return res.status(409).send({error: error.message})
+    }
+    else{
+        console.log(error.message)
+    }
+    next(error)
+}
+
 app.get('/api/persons',(req, response) =>{
     Person.find({})
     .then(persons => {
@@ -22,18 +35,14 @@ app.get('/api/persons',(req, response) =>{
     })
 })
 
-app.get('/api/persons/:id',(req, response) =>{
+app.get('/api/persons/:id',(req, response, next) =>{
     Person.findById(req.params.id).then(person => {
         response.send(person)
     })
+    .catch(error => next(error))
 })
 
-// app.get('/info',(req, response) =>{
-//     const resp = `Phonebook has info for ${taulukko.length} people <br> ${new Date()}` 
-//     response.send(resp)
-// })
-
-app.delete('/api/persons/:id',(req, response) =>{
+app.delete('/api/persons/:id',(req, response, next) =>{
     
     Person.findByIdAndRemove(req.params.id)
     .then(result=> {
@@ -42,11 +51,9 @@ app.delete('/api/persons/:id',(req, response) =>{
     .catch(error =>{
         next(error)
     })
-
-    response.status(204).end()
 })
 
-app.post('/api/persons', (req, response) =>{
+app.post('/api/persons', (req, response, next) =>{
     const body = req.body;
     
     if(!body.name || !body.number){
@@ -57,22 +64,30 @@ app.post('/api/persons', (req, response) =>{
         name: body.name,
         number: body.number
     })
-    person.save().then(response => {
-        console.log("Person added to db")
+    person.save()
+    .then(savedPerson => savedPerson.toJSON())
+    .then(savedAndFormated =>{
+        response.json(savedAndFormated)
     })
-
-    response.json(person)
+    .catch(error => next(error))
 })
 
-app.put('/api/persons/:id', (req, res) =>{
+app.put('/api/persons/:id', (req, res, next) =>{
     const body = req.body
 
-    let newPerson = taulukko.find(person => person.id === Number(req.params.id))
-    newPerson.number = body.number;
+    const person = {
+        name: body.name,
+        number: body.number
+    }
     
-    res.json(newPerson)
-    
+    Person.findByIdAndUpdate(req.params.id, person, {new:true})
+    .then(updatedPerson => res.json(updatedPerson))
+    .catch(error => next(error))    
 })
+
+app.use(errorHandler)
+
+
 const PORT = process.env.PORT
 app.listen(PORT, () =>{
     console.log("Server started at port " + PORT)
